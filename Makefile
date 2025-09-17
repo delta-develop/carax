@@ -17,32 +17,32 @@ endif
 help:
 	@echo "Usage: make [target]"
 	@echo ""
-	@echo "Available targets:"
+	@echo "Core targets:"
+	@echo "  install           Install requirements (with tool checks)."
+	@echo "  test              Run tests."
+	@echo "  run               Run the service and dependencies in Docker."
+	@echo "  down              Teardown running services."
+	@echo "  clean             Teardown and remove containers/volumes."
+	@echo ""
+	@echo "Extra targets:"
 	@echo "  up                Starts all services in the background."
-	@echo "  run               Alias for 'up'."
-	@echo "  down              Stops and removes all containers, networks, and (optionally) volumes."
 	@echo "  build             Builds or rebuilds service images (especially 'app')."
 	@echo "  build-app         Specifically builds the 'app' service image."
-	@echo "  open-api          Opens the API URL (${API_URL}) in the default browser."
-	@echo "  open-dashboards   Opens the OpenSearch Dashboards URL (${DASHBOARDS_URL}) in the default browser."
 	@echo "  logs              Shows logs for all services."
 	@echo "  logs-app          Shows logs for the 'app' service."
 	@echo "  ps                Lists running containers."
 	@echo "  restart           Restarts all services (down + up)."
 	@echo "  rebuild           Rebuilds the 'app' image and restarts all services."
-	@echo "  setup             Runs the setup script to initialize databases and indices."
-	@echo "  shell             Opens an interactive shell in the 'app' service container."
-	@echo "  install           Installs Python requirements locally."
-	@echo "  test              Runs tests with coverage."
-	@echo "  clean             Tear down and remove containers and dangling resources."
+	@echo "  setup             Initialize database schema inside the app container."
+	@echo "  shell             Open an interactive shell in the 'app' container."
 
 # Start all services
 up:
 	@echo "Starting all services..."
 	docker-compose -f docker-compose.yml up -d
 
-# Alias for up
-run: up
+# Run service and dependencies (build then up)
+run: build-up
 
 # Stop all services
 down:
@@ -74,6 +74,7 @@ rebuild: build-app down up
 
 .PHONY: fucking_nuke
 
+# Use under your own risk, this will clean EVERYTHING in your docker, so be careful.
 fucking_nuke:
 	@echo "⚠️  Ejecutando nuke total de Docker..."; \
 	docker rm -f $$(docker ps -aq) 2>/dev/null || true; \
@@ -98,7 +99,7 @@ venv:
 	. venv/bin/activate && exec $$SHELL
 
 psql:
-	docker-compose -f docker-compose.yml exec postgres psql -U carax -d conversations
+	docker-compose -f docker-compose.yml exec postgres psql -U carax -d db
 
 rebuild-app:
 	docker-compose -f docker-compose.yml build app
@@ -111,8 +112,31 @@ test:
 	coverage report -m
 
 install:
-	pip install --upgrade pip
-	pip install -r requirements.txt
+	@# Check required tools and provide install guidance if missing
+	@if ! command -v docker >/dev/null 2>&1; then \
+		echo "[!] docker is not installed."; \
+		echo "    macOS:   brew install --cask docker && open -a Docker"; \
+		echo "    Ubuntu:  sudo apt-get update && sudo apt-get install docker.io"; \
+		exit 1; \
+	fi
+	@if ! command -v docker-compose >/dev/null 2>&1; then \
+		echo "[!] docker-compose not found."; \
+		echo "    Option A: Install Docker Desktop (includes compose)."; \
+		echo "    Option B: pipx install docker-compose OR brew install docker-compose"; \
+		exit 1; \
+	fi
+	@if ! command -v python3 >/dev/null 2>&1; then \
+		echo "[!] python3 is not installed."; \
+		echo "    macOS:   brew install python"; \
+		echo "    Ubuntu:  sudo apt-get install -y python3 python3-venv"; \
+		exit 1; \
+	fi
+	@if ! command -v pip >/dev/null 2>&1; then \
+		echo "[!] pip not found; using python -m pip"; \
+		python3 -m ensurepip --upgrade || true; \
+	fi
+	python3 -m pip install --upgrade pip
+	python3 -m pip install -r requirements.txt
 
 clean:
 	@echo "Stopping and removing containers, networks, and volumes..."

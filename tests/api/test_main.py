@@ -13,9 +13,9 @@ def client():
 
 
 def test_author_requires_auth(client):
-    # no auth
+    # no auth: HTTPBearer returns 403 when missing credentials
     r = client.get("/author")
-    assert r.status_code == 401
+    assert r.status_code in (401, 403)
 
     # with auth
     headers = {"Authorization": f"Bearer {os.environ['API_KEY']}"}
@@ -32,8 +32,10 @@ def test_chat_new_conversation_uses_service(client, monkeypatch):
         async def start_conversation(self, msg):
             return {"conversation_id": "conv-x", "topic": "T", "stance": "S"}
 
-    # override dependency to return our dummy
-    monkeypatch.setattr(main_mod, "get_conversation_service", lambda request: DummyService())
+    # override FastAPI dependency to return our dummy
+    main_mod.app.dependency_overrides[main_mod.get_conversation_service] = (
+        lambda: DummyService()
+    )
 
     r = client.post("/chat", json={"message": "inicia"}, headers=headers)
     assert r.status_code == 200
@@ -51,11 +53,12 @@ def test_chat_existing_conversation_returns_response(client, monkeypatch):
         async def persist_conversation(self, *args, **kwargs):
             return None
 
-    monkeypatch.setattr(main_mod, "get_conversation_service", lambda request: DummyService())
+    main_mod.app.dependency_overrides[main_mod.get_conversation_service] = (
+        lambda: DummyService()
+    )
 
     r = client.post("/chat", json={"conversation_id": "conv-1", "message": "hola"}, headers=headers)
     assert r.status_code == 200
     data = r.json()
     assert data["conversation_id"] == "conv-1"
     assert isinstance(data.get("message"), list)
-

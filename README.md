@@ -1,143 +1,142 @@
+# CARAX — Debate Chatbot API
 
+Carax is a FastAPI-based service for hosting a debate-oriented chatbot. The bot holds a coherent stance for a topic, argues persuasively across multiple turns, and keeps a short-term memory to maintain context.
 
-# CARAX
+- Tech: FastAPI, SQLModel, PostgreSQL, Redis, Docker/Compose, OpenAI API.
+- Public chat endpoint: https://trusting-shrew-blindly.ngrok-free.app/chat
+- Author info endpoint: `GET /author` (protected with API key).
 
-Carax is a data ingestion and indexing system that allows uploading CSV files, parsing them, and storing the data both in PostgreSQL and OpenSearch. It is designed with a modular and asynchronous architecture using FastAPI, SQLModel, and Docker.
+Note: The goal is to stand the ground on the initial topic/stance and be persuasive across 5+ messages. Responses target ≤ 30 seconds.
 
-## Features
+## Quick Start
 
-- Upload and process CSV files via HTTP endpoint
-- Store records in PostgreSQL and OpenSearch simultaneously
-- Chunked and asynchronous processing for performance
-- Uses OpenSearch to allow indexing and searching
-- Uses PostgreSQL for relational data storage
-
-## Getting Started
-
-### Requirements
-
-- Docker and Docker Compose
+Requirements:
+- Docker + Docker Compose
 - Make
 
-### Running the Project
+Run the service:
+1) make run
+2) make setup
 
-To start the application:
+After step 2 the API is ready to receive requests.
 
-```bash
-make start
+## Environment
+
+Copy `.env.example` to `.env` and fill in your values:
+- `API_KEY`: Required Bearer token for protected endpoints.
+- `OPENAI_API_KEY`: Required to talk to the OpenAI API.
+- `DB_ASYNC_CONNECTION_STR`, `REDIS_URL`: Use the defaults to talk to Compose services.
+
+## Make Targets
+
+- `make`: Show the most useful commands.
+- `make install`: Check tools, install Python deps.
+- `make run`: Build + start all services in Docker.
+- `make setup`: Initialize database schema.
+- `make test`: Run tests.
+- `make down`: Stop all services.
+- `make clean`: Remove containers and volumes.
+
+## API
+
+Auth header: send `Authorization: Bearer <API_KEY>`. For now, use `prod-kopi-api-key` as the token value.
+
+- `POST /chat` — debate turn
+  Request body:
+  - First message (new conversation): `{ "message": "Text defining topic and stance" }`
+  - Subsequent messages: `{ "conversation_id": "id", "message": "Text" }`
+
+  Response body:
+  - New conversation: `{ "conversation_id": "id", "topic": "...", "stance": "..." }`
+  - Existing conversation: `{ "conversation_id": "id", "message": [ {"role": "user"|"bot", "message": "..."}, ... ] }` (last 5 entries)
+
+- `GET /author` — author metadata
+
+Example cURL:
+```
+curl -X POST \
+  -H "Authorization: Bearer prod-kopi-api-key" \
+  -H "Content-Type: application/json" \
+  -d '{"message": "Debate about climate change. You argue it is not real."}' \
+  http://localhost:8000/chat
 ```
 
-This will build and run all required containers (API, PostgreSQL, OpenSearch, etc.).
+## Database Schema
 
-### Initial Setup
+The relational schema (PostgreSQL) models conversations, messages, and rolling summaries.
 
-After running the containers, you **must** initialize the databases by running:
+```mermaid
+erDiagram
+  Conversation {
+    string id PK
+    string topic
+    string stance
+    datetime created_at
+  }
 
-```bash
-make setup
+  Message {
+    int id PK
+    string conversation_id FK
+    enum role  "user|assistant|system"
+    jsonb content
+    datetime created_at
+  }
+
+  Summary {
+    int id PK
+    string conversation_id FK
+    int version
+    string summary
+    int first_message_id
+    int last_message_id
+    int tokens_estimate
+    datetime created_at
+  }
+
+  Conversation ||--o{ Message : has
+  Conversation ||--o{ Summary : has
 ```
 
-This command will:
+## Request Flow (Timing)
 
-- Create the required tables in PostgreSQL
-- Create the index in OpenSearch
+Sequence of a typical `/chat` request.
 
-Skipping this step will cause the application to fail when trying to interact with the databases.
+```mermaid
+sequenceDiagram
+  participant C as Client
+  participant A as API (FastAPI)
+  participant R as Cache (Redis)
+  participant D as DB (Postgres)
+  participant O as OpenAI API
 
-Let the system finish all it tasks, give one or two minutes and then you can send a Postman Request to `/upload` this will save data in postgres and create embeddings with data in opensearch.
+  C->>A: POST /chat (message[, conversation_id])
+  A->>A: Validate + sanitize
+  alt New conversation
+    A->>O: Build prompt (topic/stance) and request
+    O-->>A: topic/stance JSON
+    A->>D: INSERT conversation
+    A->>R: SET {conv_id}:meta (topic, stance)
+    A-->>C: 200 OK { conversation_id, topic, stance }
+  else Existing conversation
+    A->>R: GET {conv_id}:messages (recent)
+    A->>D: GET Summary (optional)
+    A->>O: Build prompt (with context) and request
+    O-->>A: assistant reply
+    A-->>C: 200 OK { conversation_id, message: last 5 }
+    par Background persist
+      A->>R: APPEND messages
+      A->>D: INSERT user/bot messages
+    end
+  end
+```
 
-![alt text](image.png)
+## Public URL
 
-Other available urls:
-
-- `GET /search` Perform a manual search into OpenSearch.
-  Example: `http://localhost:8000/search?query=tracción 4wd`
-
-- `POST /debug/migrate-memory` Enforces system to migrate WorkingMemory to Long-Term  emory. Example: `http://localhost:8000/debug/migrate-memory?user_id=5215578771322`
-
-- `GET /author` Retrieve author data
-
-- `POST /webhook/whatsapp` You can manually simulate the receive of a message, this is a `x-www-form-urlencoded` so it will require fields:
-- `From` with format `whatsapp:+5215578771322`
-- `Body` with the message
-- `Sandbox` By sending `true` you will only see response in Postman but not in whatsapp.
-
-
-
-### Useful Makefile Commands
-
-- `make rebuild-app` - Rebuilds the Docker containers and runs the application
-- `make setup` - Initializes database schemas (PostgreSQL + OpenSearch)
-- `make enter-app` - Enters the running app container
-- `make activate-venv` - Activates the virtual environment inside the container
-- `make rebuild-python` - Rebuilds only the Python-related containers without resetting databases
-- `make logs` - Follows the logs of all Docker containers
-
-### API Endpoint
-
-- `POST /upload` - Upload a CSV file to ingest data into the system
+When running with Docker Compose, an `ngrok` container exposes the API publicly:
+- `POST https://trusting-shrew-blindly.ngrok-free.app/chat`
 
 ## Notes
 
-- The system uses chunked ingestion (100 records per chunk) to avoid memory issues
-- Boolean fields are interpreted from strings like "Sí", "Yes", "True", etc.
-- Duplicate records are avoided in OpenSearch by using `stock_id` as the document ID
-
----
-
-Built with 💻 and lots of coffee ☕️ by Leonardo and ChatGPT.
-(Si lo leí, si le di permiso de que lo pusiera ahí, sería irónico crear un sistema para trabajar con LLMs sin usar un LLM ¿no creen? atentamente y con mucho respeto, Leo)
-
-
-## Conversation Memory Use Cases
-
-Carax incorporates a multi-layered memory system inspired by human cognition, enabling rich and context-aware interactions. These are the main use cases supported by the `CognitiveOrchestrator`:
-
-### Initial Conversation Bootstrapping
-When a user starts a new conversation, the system retrieves and loads:
-- A summarized memory (semantic context)
-- A structured factual memory (preferences, identity, traits)
-
-These components are injected as non-conversational context to prime the LLM for coherent and personalized responses.
-
-### Ongoing Interaction
-As the user and assistant exchange messages, each turn is stored in working memory (Redis). This cache:
-- Tracks recent turns for continuity
-- Is kept separate from factual memory and summary memory to avoid mixing signal with noise
-
-### Contextual Expansion on Demand
-If the LLM cannot resolve a user's query due to insufficient context, the orchestrator:
-- Retrieves the full episodic history from long-term memory (MongoDB)
-- Augments the current prompt with this deep history for accurate reasoning
-
-### Conversation Closure and Consolidation
-When the conversation ends—either due to inactivity or an explicit farewell—the orchestrator:
-- Persists the working memory into the episodic memory store (append-only)
-- Summarizes the recent session and merges it with the prior summary
-- Extracts any newly revealed facts and updates the factual memory accordingly
-
-This layered approach ensures long-term retention, efficient recall, and low-token consumption during active sessions.
-
-
-
-## 📚 Used prompts
-
-```mermaid
-graph TD
-  P1[INTENTION_PROMPT] --> Detecta_intención
-  P2[FILTER_EXTRACTION_PROMPT] --> Extrae_filtros_JSON
-  P3[VEHICLE_SUMMARIZATION_PROMPT] --> Resume_autos
-  P4[FINANCE_PROMPT] --> Estima_mensualidades
-  P5[KAVAK_INFO_PROMPT] --> Responde_dudas_generales
-  P6[EXIT_PROMPT] --> Cierre_conversación
-```
-
-## 🧠 Agent Memory
-
-```mermaid
-graph TD
-  REDIS[Working Memory - Redis] --> CURRENT[Conversación actual]
-  MONGO_FACT[Fact Memory - MongoDB] --> USER_DATA[Datos del usuario]
-  MONGO_SUM[Summary Memory - MongoDB] --> SUMMARY[Resumen de conversaciones]
-  MONGO_EPISODIC[Episodic Memory - MongoDB] --> HISTORY[Historial completo]
-```
+- Responses aim to be persuasive and consistent with the initial stance.
+- Short-term memory is cached for efficiency; background tasks persist turns.
+- Tests mock external services; a real OpenAI key is not required to run tests.
