@@ -1,7 +1,7 @@
-from typing import List
+from typing import List, Dict
 
 
-def format_conversation(messages: List[dict]) -> List[dict[str, str]]:
+def format_conversation(messages: List[Dict]) -> List[Dict[str, str]]:
     """Filter and normalize a raw message list for the LLM.
 
     Args:
@@ -17,7 +17,7 @@ def format_conversation(messages: List[dict]) -> List[dict[str, str]]:
     ]
 
 
-def message_from_user_input(text: str) -> dict[str, str]:
+def message_from_user_input(text: str) -> Dict[str, str]:
     """Create a normalized user message object.
 
     Args:
@@ -29,7 +29,7 @@ def message_from_user_input(text: str) -> dict[str, str]:
     return {"role": "user", "content": text.strip()}
 
 
-def message_from_llm_output(text: str) -> dict[str, str]:
+def message_from_llm_output(text: str) -> Dict[str, str]:
     """Create a normalized assistant message object.
 
     Args:

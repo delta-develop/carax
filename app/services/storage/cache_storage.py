@@ -1,5 +1,5 @@
 import json
-from typing import Any
+from typing import Any, Optional, Union
 
 from app.services.storage.connections import get_redis_client
 
@@ -93,14 +93,14 @@ class CacheStorage:
         current.append({"role": "assistant", "content": assistant_msg})
         await self.set(key, current)
 
-    async def get_raw(self, key: str) -> str:
+    async def get_raw(self, key: str) -> Optional[Union[str, bytes]]:
         """Retrieve the unparsed Redis value for a key.
 
         Args:
             key: Cache key.
 
         Returns:
-            str: Raw stored value.
+            Optional[Union[str, bytes]]: Raw stored value (depends on Redis client config).
         """
         redis = await self._get_redis()
         return await redis.get(self._make_key(key))

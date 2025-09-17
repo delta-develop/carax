@@ -11,11 +11,9 @@ from fastapi import (
 )
 
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
-from typing import List, Any, Optional
+from typing import Any, Dict
 
 from app.services.storage.relational_storage import RelationalStorage
-from app.services.storage.cache_storage import CacheStorage
-from app.utils.sanitization import sanitize_message
 from app.utils.message_adapter import (
     message_from_user_input,
 )
@@ -100,7 +98,7 @@ async def require_api_key(
 
 # Author information endpoint
 @app.get("/author")
-async def get_author(_auth: bool = Depends(require_api_key)):
+async def get_author(_auth: bool = Depends(require_api_key)) -> Dict[str, str]:
     """Return author metadata for the project."""
     return {
         "name": "Leonardo HG",
@@ -116,7 +114,7 @@ async def conversation(
     bg: BackgroundTasks,
     _auth: bool = Depends(require_api_key),
     conversation_service: ConversationService = Depends(get_conversation_service),
-):
+) -> Dict[str, Any]:
     """Handle a chat turn and persist it in the background.
 
     For new conversations (no `conversation_id`), extracts topic and stance.

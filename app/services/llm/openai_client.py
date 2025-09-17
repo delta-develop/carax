@@ -1,5 +1,5 @@
 import os
-from typing import Dict, List
+from typing import Any, Dict, List
 
 from app.services.llm.base import LLMBase
 from app.services.storage.connections import get_openai_client
@@ -18,13 +18,13 @@ class OpenAIClient(LLMBase):
         self.temperature = float(os.getenv("OPENAI_TEMPERATURE", 0.7))
         self.client = None
 
-    async def get_client(self):
+    async def get_client(self) -> "AsyncOpenAI":
         """Lazily initialize and return the OpenAI client instance."""
         if self.client is None:
             self.client = await get_openai_client()
         return self.client
 
-    async def generate_response(self, messages: List[Dict]) -> str:
+    async def generate_response(self, messages: List[Dict[str, Any]]) -> str:
         """Generate a response using the configured chat model.
 
         Args:
@@ -42,7 +42,7 @@ class OpenAIClient(LLMBase):
         )
         return response.choices[0].message.content.strip()
 
-    async def interpret(self, user_input: str) -> Dict:
+    async def interpret(self, user_input: str) -> Dict[str, Any]:
         """Return a trivial interpretation payload for raw input.
 
         Args:

@@ -1,3 +1,5 @@
+from typing import Any, Dict, List, Optional, Tuple
+
 from app.prompts.build_prompt import (
     build_conversation_prompt,
     build_new_conversation_prompt,
@@ -10,6 +12,9 @@ from app.utils.message_adapter import (
     message_from_user_input,
     message_from_llm_output,
 )
+from app.services.llm.base import LLMBase
+from app.services.storage.base import Storage
+from app.services.memory.memory import Memory
 
 
 class ConversationService:
@@ -25,7 +30,7 @@ class ConversationService:
         cache: Ephemeral storage for recent message history per conversation.
     """
 
-    def __init__(self, *, llm, store, cache):
+    def __init__(self, *, llm: LLMBase, store: Storage, cache: Memory) -> None:
         """Initialize the conversation service.
 
         Args:
@@ -37,7 +42,7 @@ class ConversationService:
         self.store = store
         self.cache = cache
 
-    async def start_conversation(self, user_message):
+    async def start_conversation(self, user_message: Dict[str, str]) -> Dict[str, str]:
         """Start a new debate given the user's first message.
 
         The first message defines the topic and the stance the bot must adopt.
@@ -45,17 +50,17 @@ class ConversationService:
         stores metadata, and returns an identifier for subsequent turns.
 
         Args:
-            user_message: Raw text from the user to initialize the debate.
+            user_message: Normalized message dict from the user to initialize the debate.
 
         Returns:
             dict: A dictionary with keys `conversation_id`, `topic`, and `stance`.
         """
-        new_conversation_prompt = build_new_conversation_prompt(user_message)
+        new_conversation_prompt = build_new_conversation_prompt(user_message["content"])
         llm_response = await self.llm.generate_response(
             [{"role": "user", "content": new_conversation_prompt}]
         )
-        llm_response_dict = json.loads(llm_response)
-        topic_and_stance = {
+        llm_response_dict: Dict[str, str] = json.loads(llm_response)
+        topic_and_stance: Dict[str, str] = {
             "topic": llm_response_dict["topic"],
             "stance": llm_response_dict["stance"],
         }
@@ -67,7 +72,9 @@ class ConversationService:
 
         return llm_response_dict
 
-    async def continue_conversation(self, conversation_id, user_message):
+    async def continue_conversation(
+        self, conversation_id: str, user_message: Dict[str, str]
+    ) -> Tuple[Dict[str, Any], Dict[str, str]]:
         """Continue an ongoing debate with the latest user message.
 
         It composes a debate prompt from topic/stance, short-term history, and
@@ -100,28 +107,28 @@ class ConversationService:
 
         llm_formated_response = message_from_llm_output(llm_response)
 
-        messages = cache_stored_messages or []
+        messages: List[Dict[str, str]] = list(cache_stored_messages or [])
         messages.append(user_message)
         messages.append(llm_formated_response)
 
-        response = {"conversation_id": conversation_id, "message": messages[-5:]}
+        response: Dict[str, Any] = {
+            "conversation_id": conversation_id,
+            "message": messages[-5:],
+        }
 
         return response, llm_formated_response
 
     async def persist_conversation(
-        self, conversation_id, user_message, llm_formated_response
-    ):
+        self, conversation_id: str, user_message: Dict[str, str], llm_formated_response: Dict[str, str]
+    ) -> None:
         """Persist the latest user/bot turn into cache and durable storage.
 
         Args:
             conversation_id: Conversation identifier to associate with the turn.
             user_message: The user's message dict (role/content).
             llm_formated_response: The assistant's message dict (role/content).
-
-        Returns:
-            None
         """
-        data = {
+        data: Dict[str, Any] = {
             "user_message": user_message,
             "bot_message": llm_formated_response,
         }

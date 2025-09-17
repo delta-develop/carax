@@ -1,9 +1,13 @@
+from typing import Any, Dict, List, Optional
 from app.prompts.constants import CONVERSATION_PROMPT, NEW_CONVERSATION_PROMPT
 
 
 def build_conversation_prompt(
-    topic_and_stance, redis_stored_messages, messages_summary, last_message
-):
+    topic_and_stance: Dict[str, str],
+    redis_stored_messages: Optional[List[Dict[str, str]]],
+    messages_summary: Optional[Any],
+    last_message: Dict[str, str],
+) -> str:
     """Compose the prompt for an ongoing debate turn.
 
     Args:
@@ -25,7 +29,7 @@ def build_conversation_prompt(
     return prompt
 
 
-def build_new_conversation_prompt(message):
+def build_new_conversation_prompt(message: str) -> str:
     """Compose the prompt that extracts topic and stance from the first message.
 
     Args:

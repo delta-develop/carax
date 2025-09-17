@@ -1,5 +1,5 @@
 import os
-from typing import Any, Dict
+from typing import Any, Dict, List, Optional
 
 from sqlalchemy.ext.asyncio import (
     AsyncEngine,
@@ -49,7 +49,7 @@ class RelationalStorage(Storage):
         async with self.engine.begin() as conn:
             await conn.run_sync(SQLModel.metadata.create_all)
 
-    async def save(self, data: Dict[str, Any]):
+    async def save(self, data: Dict[str, Any]) -> Optional[str]:
         """Persist a conversation or messages depending on the payload.
 
         If `conversation_id` is absent, creates a new conversation record and
@@ -88,7 +88,7 @@ class RelationalStorage(Storage):
 
                     await session.flush()
 
-    async def get(self, filters: Dict[str, Any]) -> list[Dict[str, Any]]:
+    async def get(self, filters: Dict[str, Any]) -> List[Dict[str, Any]]:
         """Query records using filter criteria.
 
         Args:
@@ -99,7 +99,7 @@ class RelationalStorage(Storage):
         """
         pass
 
-    async def bulk_load(self, data: Dict) -> list[Dict[str, Any]]:
+    async def bulk_load(self, data: Dict) -> List[Dict[str, Any]]:
         """Bulk insert multiple records asynchronously.
 
         Args:
