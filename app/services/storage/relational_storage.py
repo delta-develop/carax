@@ -52,13 +52,38 @@ class RelationalStorage(Storage):
         async with self.engine.begin() as conn:
             await conn.run_sync(SQLModel.metadata.create_all)
 
-    async def save(self, data: Dict[str, Any]) -> None:
+    async def save(self, data: Dict[str, Any]):
         """Save a single vehicle record to the database asynchronously.
 
         Args:
             data (Dict[str, Any]): The data dictionary representing a vehicle.
         """
-        pass
+
+        async with self.session_local() as session:
+            async with session.begin():
+                if "conversation_id" not in data:
+                    conversation = Conversation(**data)
+                    session.add(conversation)
+                    await session.flush()
+                    return conversation.id
+
+                else:
+                    user_message_data = {
+                        "conversation_id": data["conversation_id"],
+                        **data["user_message"],
+                    }
+
+                    bot_message_data = {
+                        "conversation_id": data["conversation_id"],
+                        **data["bot_message"],
+                    }
+                    user_message = Message(**user_message_data)
+                    bot_message = Message(**bot_message_data)
+
+                    session.add(user_message)
+                    session.add(bot_message)
+
+                    await session.flush()
 
     async def get(self, filters: Dict[str, Any]) -> list[Dict[str, Any]]:
         """Query vehicle records asynchronously using filter criteria.

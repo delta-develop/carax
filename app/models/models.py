@@ -1,13 +1,17 @@
 # app/db/models.py
-from __future__ import annotations
-from typing import Optional, Literal, List, Dict, Any
+from typing import Optional, List, Dict, Any
+from enum import Enum
 from sqlmodel import SQLModel, Field, Relationship
-from sqlalchemy import Column
+from sqlalchemy import Column, Enum as SAEnum
 from sqlalchemy.dialects.postgresql import JSONB
 from datetime import datetime
 import uuid
 
-Role = Literal["user", "assistant", "system"]
+
+class RoleEnum(str, Enum):
+    user = "user"
+    assistant = "assistant"
+    system = "system"
 
 
 class Conversation(SQLModel, table=True):
@@ -23,12 +27,12 @@ class Conversation(SQLModel, table=True):
 class Message(SQLModel, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)  # autoincrement
     conversation_id: str = Field(foreign_key="conversation.id")
-    role: Role
+    role: RoleEnum
 
     content: Dict[str, Any] = Field(sa_column=Column(JSONB))
     created_at: datetime = Field(default_factory=datetime.now)
 
-    conversation: Conversation = Relationship(back_populates="messages")
+    conversation: "Conversation" = Relationship(back_populates="messages")
 
 
 class Summary(SQLModel, table=True):
@@ -43,4 +47,4 @@ class Summary(SQLModel, table=True):
     tokens_estimate: int = 0
     created_at: datetime = Field(default_factory=datetime.now)
 
-    conversation: Conversation = Relationship(back_populates="summaries")
+    conversation: "Conversation" = Relationship(back_populates="summaries")
