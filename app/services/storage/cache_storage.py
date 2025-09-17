@@ -5,47 +5,43 @@ from app.services.storage.connections import get_redis_client
 
 
 class CacheStorage:
-    """Handles caching operations with Redis for namespaced memory interactions."""
+    """Redis-backed working memory for short-term debate context.
+
+    Provides simple get/set/delete operations plus utilities to append user-bot
+    interactions, enabling fast retrieval of the latest turns within a debate.
+    """
 
     def __init__(self, namespace="memory"):
-        """
-        Initializes a new instance of CacheStorage.
+        """Initialize the cache wrapper.
 
         Args:
-            namespace (str): The namespace prefix for Redis keys.
+            namespace: Prefix applied to all Redis keys.
         """
         self.namespace = namespace
 
     async def _get_redis(self):
-        """
-        Retrieves a Redis client connection.
-
-        Returns:
-            Redis client instance.
-        """
+        """Get a Redis client connection (singleton)."""
         return await get_redis_client()
 
     def _make_key(self, key: str) -> str:
-        """
-        Constructs a namespaced Redis key.
+        """Build a namespaced Redis key.
 
         Args:
-            key (str): The base key.
+            key: Base key.
 
         Returns:
-            str: The namespaced key.
+            str: Namespaced key.
         """
         return f"{self.namespace}:{key}"
 
     async def get(self, key: str) -> Any:
-        """
-        Retrieves and deserializes the value for the given key from Redis.
+        """Fetch and deserialize a value by key.
 
         Args:
-            key (str): The key to retrieve.
+            key: Cache key to retrieve.
 
         Returns:
-            Any: The deserialized value or None if not found.
+            Any | None: Deserialized value or None if missing.
         """
         redis = await self._get_redis()
         data = await redis.get(self._make_key(key))
@@ -57,13 +53,12 @@ class CacheStorage:
         return None
 
     async def set(self, key: str, value: Any, ttl: int = 0) -> None:
-        """
-        Serializes and stores a value in Redis under the specified key.
+        """Serialize and store a value, optionally with TTL.
 
         Args:
-            key (str): The key under which to store the value.
-            value (Any): The value to store.
-            ttl (int): Time to live in seconds. If 0, the key does not expire.
+            key: Cache key.
+            value: Value to serialize and store.
+            ttl: Expiration in seconds; 0 disables expiration.
         """
         redis = await self._get_redis()
         data = json.dumps(value)
@@ -74,11 +69,10 @@ class CacheStorage:
             await redis.set(namespaced_key, data)
 
     async def delete(self, key: str) -> None:
-        """
-        Deletes a key from Redis.
+        """Remove a key from Redis.
 
         Args:
-            key (str): The key to delete.
+            key: Key to delete.
         """
         redis = await self._get_redis()
         await redis.delete(self._make_key(key))
@@ -86,13 +80,12 @@ class CacheStorage:
     async def append_interaction(
         self, key: str, user_msg: str, assistant_msg: str
     ) -> None:
-        """
-        Appends a user and assistant interaction to a Redis list.
+        """Append a user/assistant turn to the conversation list.
 
         Args:
-            key (str): The key representing the conversation.
-            user_msg (str): The user's message.
-            assistant_msg (str): The assistant's reply.
+            key: Conversation key.
+            user_msg: User message text.
+            assistant_msg: Assistant reply text.
         """
         await self._get_redis()
         current = await self.get(key) or []
@@ -101,14 +94,13 @@ class CacheStorage:
         await self.set(key, current)
 
     async def get_raw(self, key: str) -> str:
-        """
-        Retrieves the raw (unparsed) Redis value for a given key.
+        """Retrieve the unparsed Redis value for a key.
 
         Args:
-            key (str): The key to retrieve.
+            key: Cache key.
 
         Returns:
-            str: The raw string value stored in Redis.
+            str: Raw stored value.
         """
         redis = await self._get_redis()
         return await redis.get(self._make_key(key))

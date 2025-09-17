@@ -6,36 +6,32 @@ from app.services.storage.connections import get_openai_client
 
 
 class OpenAIClient(LLMBase):
-    """Asynchronous OpenAI client that implements the LLMBase interface.
+    """Async OpenAI client implementing the LLMBase interface.
 
-    This client handles generating responses from a chat-based language model
-    and interpreting user input.
+    Generates chat completions for debate turns and offers a minimal
+    interpretation fallback for structured prompts.
     """
 
     def __init__(self):
-        """Initializes the OpenAIClient with model parameters from environment variables."""
+        """Initialize model and temperature from environment variables."""
         self.model = os.getenv("OPENAI_MODEL")
         self.temperature = float(os.getenv("OPENAI_TEMPERATURE", 0.7))
         self.client = None
 
     async def get_client(self):
-        """Lazily initializes and returns the OpenAI client.
-
-        Returns:
-            An instance of the OpenAI client.
-        """
+        """Lazily initialize and return the OpenAI client instance."""
         if self.client is None:
             self.client = await get_openai_client()
         return self.client
 
     async def generate_response(self, messages: List[Dict]) -> str:
-        """Generates a response from the language model based on the given message history.
+        """Generate a response using the configured chat model.
 
         Args:
-            messages (List[Dict]): A list of message dictionaries representing the conversation history.
+            messages: Conversation history for the model.
 
         Returns:
-            str: The generated response from the language model.
+            str: Trimmed model response text.
         """
         if not self.client:
             self.client = await self.get_client()
@@ -47,12 +43,12 @@ class OpenAIClient(LLMBase):
         return response.choices[0].message.content.strip()
 
     async def interpret(self, user_input: str) -> Dict:
-        """Interprets user input and returns a basic intent response.
+        """Return a trivial interpretation payload for raw input.
 
         Args:
-            user_input (str): The raw input text from the user.
+            user_input: Raw user text.
 
         Returns:
-            Dict: A dictionary containing the inferred intent and the original message.
+            dict: Minimal structure with default intent and echo of input.
         """
         return {"intent": "default", "message": user_input}

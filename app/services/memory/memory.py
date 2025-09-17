@@ -3,35 +3,35 @@ from typing import Any
 
 
 class Memory(ABC):
-    """Abstract base class for memory storage systems."""
+    """Abstract contract for memory backends used by the debate bot."""
 
     @abstractmethod
     async def store_in_memory(self, key: str, data: Any) -> None:
-        """Stores data in memory associated with a specific key.
+        """Store data under a memory key.
 
         Args:
-            key (str): The key used to identify the data.
-            data (Any): The data to store.
+            key: Memory key (e.g., conversation or user identifier).
+            data: Payload to store.
         """
-        pass
+        raise NotImplementedError
 
     @abstractmethod
     async def retrieve_from_memory(self, key: str) -> Any:
-        """Retrieves data from memory using a specific key.
+        """Retrieve data by memory key.
 
         Args:
-            key (str): The key used to identify the data.
+            key: Memory key.
 
         Returns:
-            Any: The data associated with the key, or None if not found.
+            Any: Stored value or None.
         """
-        pass
+        raise NotImplementedError
 
     @abstractmethod
     async def delete_from_memory(self, key: str) -> None:
-        """Deletes data from memory associated with a specific key.
+        """Delete data for a memory key.
 
         Args:
-            key (str): The key used to identify the data to delete.
+            key: Memory key.
         """
-        pass
+        raise NotImplementedError

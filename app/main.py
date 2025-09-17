@@ -3,12 +3,8 @@ import dotenv
 from fastapi import (
     APIRouter,
     FastAPI,
-    File,
     HTTPException,
-    Query,
     Request,
-    Response,
-    UploadFile,
     Depends,
     status,
     BackgroundTasks,
@@ -17,41 +13,83 @@ from fastapi import (
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from typing import List, Any, Optional
 
-import openai
-from app.services.memory.cognitive_orchestrator import CognitiveOrchestrator
 from app.services.storage.relational_storage import RelationalStorage
 from app.services.storage.cache_storage import CacheStorage
 from app.utils.sanitization import sanitize_message
 from app.utils.message_adapter import (
-    format_conversation,
     message_from_user_input,
-    message_from_llm_output,
 )
 
 from app.services.llm.openai_client import OpenAIClient
-import json
 from app.services.memory.working_memory import WorkingMemory
-from app.prompts.build_prompt import (
-    build_conversation_prompt,
-    build_new_conversation_prompt,
-)
+
+
+from contextlib import asynccontextmanager
+
+from app.services.conversation.conversation_service import ConversationService
 
 dotenv.load_dotenv()
 security = HTTPBearer()
 API_KEY = os.getenv("API_KEY", "dev-leonardo-key")
-app = FastAPI()
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """Application lifespan manager to wire core services.
+
+    Initializes the relational storage, LLM client, and working memory and
+    exposes a `ConversationService` through the FastAPI app state.
+
+    Args:
+        app: The FastAPI application instance.
+
+    Yields:
+        None: Controls the startup/shutdown lifecycle.
+    """
+    relational_storage = RelationalStorage()
+    llm = OpenAIClient()
+    working_memory = WorkingMemory()
+
+    app.state.conversation_service = ConversationService(
+        llm=llm, store=relational_storage, cache=working_memory
+    )
+
+    yield
+
+
+app = FastAPI(lifespan=lifespan)
 router = APIRouter()
 app.include_router(router)
 
 # Initialize cache storage for debug/dev utilities
-relational_storage = RelationalStorage()
-llm = OpenAIClient()
-working_memory = WorkingMemory()
+
+
+def get_conversation_service(request: Request) -> ConversationService:
+    """Fetch the conversation service from the app state.
+
+    Args:
+        request: Incoming request used to access the app state.
+
+    Returns:
+        ConversationService: Bound service instance.
+    """
+    return request.app.state.conversation_service
 
 
 async def require_api_key(
     creds: HTTPAuthorizationCredentials = Depends(security),
 ) -> bool:
+    """Validate the Bearer token for protected endpoints.
+
+    Args:
+        creds: Authorization credentials injected by FastAPI.
+
+    Returns:
+        bool: True when the token matches `API_KEY`.
+
+    Raises:
+        HTTPException: If credentials are missing or invalid.
+    """
     if creds is None or creds.credentials != API_KEY:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid or missing token"
@@ -60,34 +98,10 @@ async def require_api_key(
     return True
 
 
-@app.post("/debug/migrate-memory")
-async def migrate_memory_endpoint(user_id: str):
-    """
-    Triggers the persistence of memory data to long-term storage for the given user ID.
-
-    Args:
-        user_id (str): The user's phone number identifier.
-
-    Returns:
-        dict: Result message or error.
-    """
-    try:
-        orchestrator = await CognitiveOrchestrator.from_defaults()
-        await orchestrator.persist_conversation_closure(user_id)
-        return {"message": f"Memoria migrada correctamente para el usuario {user_id}"}
-    except Exception as e:
-        return {"error": str(e)}
-
-
 # Author information endpoint
 @app.get("/author")
 async def get_author(_auth: bool = Depends(require_api_key)):
-    """
-    Returns author metadata for the project.
-
-    Returns:
-        dict: Author information.
-    """
+    """Return author metadata for the project."""
     return {
         "name": "Leonardo HG",
         "location": "Ciudad de México",
@@ -98,8 +112,30 @@ async def get_author(_auth: bool = Depends(require_api_key)):
 
 @app.post("/chat")
 async def conversation(
-    request: Request, bg: BackgroundTasks, _auth: bool = Depends(require_api_key)
+    request: Request,
+    bg: BackgroundTasks,
+    _auth: bool = Depends(require_api_key),
+    conversation_service: ConversationService = Depends(get_conversation_service),
 ):
+    """Handle a chat turn and persist it in the background.
+
+    For new conversations (no `conversation_id`), extracts topic and stance.
+    For ongoing conversations, composes a debate-aware prompt and returns the
+    last 5 messages, scheduling persistence as a background task.
+
+    Args:
+        request: Incoming request with JSON containing `message` and optional `conversation_id`.
+        bg: FastAPI background task manager to persist the turn asynchronously.
+        _auth: Guard ensuring the caller is authorized.
+        conversation_service: Injected service orchestrating the conversation.
+
+    Returns:
+        dict: Response envelope with either conversation metadata (new) or
+            the recent message history (existing).
+
+    Raises:
+        HTTPException: If the request payload lacks a `message`.
+    """
     data = await request.json()
 
     conversation_id = data.get("conversation_id")
@@ -113,62 +149,17 @@ async def conversation(
     user_message = message_from_user_input(message)
 
     if not conversation_id:
-        new_conversation_prompt = build_new_conversation_prompt(user_message)
-        llm_response = await llm.generate_response(
-            [{"role": "user", "content": new_conversation_prompt}]
-        )
-        llm_response_dict = json.loads(llm_response)
-        topic_and_stance = {
-            "topic": llm_response_dict["topic"],
-            "stance": llm_response_dict["stance"],
-        }
-        conversation_id = await relational_storage.save(topic_and_stance)
+        return await conversation_service.start_conversation(user_message)
 
-        await working_memory.store_in_memory(
-            f"{conversation_id}:meta", topic_and_stance
-        )
-
-        llm_response_dict.update({"conversation_id": conversation_id})
-
-        return llm_response_dict
-
-    redis_stored_messages = await working_memory.retrieve_from_memory(conversation_id)
-    topic_and_stance = await working_memory.retrieve_from_memory(
-        f"{conversation_id}:meta"
-    )
-    messages_summary = await relational_storage.get(
-        filters={"id": conversation_id, "table": "summary"}
+    response, llm_formated_response = await conversation_service.continue_conversation(
+        conversation_id, user_message
     )
 
-    conversation_prompt = build_conversation_prompt(
-        topic_and_stance, redis_stored_messages, messages_summary, user_message
+    bg.add_task(
+        conversation_service.persist_conversation,
+        conversation_id,
+        user_message,
+        llm_formated_response,
     )
-
-    llm_response = await llm.generate_response(
-        [{"role": "user", "content": conversation_prompt}]
-    )
-
-    llm_formated_response = message_from_llm_output(llm_response)
-
-    async def _persist(user_message, llm_formated_response):
-
-        data = {
-            "user_message": user_message,
-            "bot_message": llm_formated_response,
-        }
-
-        await working_memory.store_in_memory(conversation_id, data)
-
-        data["conversation_id"] = conversation_id
-
-        await relational_storage.save(data)
-
-    bg.add_task(_persist, user_message, llm_formated_response)
-
-    messages = redis_stored_messages or []
-    messages.append(user_message)
-    messages.append(llm_formated_response)
-
-    response = {"conversation_id": conversation_id, "message": messages[-5:]}
 
     return response

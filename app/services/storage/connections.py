@@ -7,13 +7,13 @@ _openai_client = None
 
 
 async def get_redis_client(redis_url="redis://redis:6379"):
-    """Initialize and return a singleton Redis client.
+    """Return a singleton async Redis client.
 
     Args:
-        redis_url (str): Redis connection URL.
+        redis_url: Redis connection URL.
 
     Returns:
-        Redis: A Redis client instance.
+        Redis: Async Redis client instance.
     """
     global _redis_client
     if _redis_client is None:
@@ -22,10 +22,10 @@ async def get_redis_client(redis_url="redis://redis:6379"):
 
 
 async def get_openai_client():
-    """Initialize and return a singleton OpenAI client.
+    """Return a singleton AsyncOpenAI client configured from env vars.
 
     Returns:
-        AsyncOpenAI: An asynchronous OpenAI client instance.
+        AsyncOpenAI: Asynchronous OpenAI client instance.
     """
     global _openai_client
     if _openai_client is None:

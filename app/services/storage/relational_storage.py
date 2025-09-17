@@ -32,11 +32,11 @@ AsyncSessionLocal = sessionmaker(
 
 
 class RelationalStorage(Storage):
-    """Asynchronous relational storage implementation using SQLModel and PostgreSQL.
+    """Async relational storage built on SQLModel + PostgreSQL.
 
     Attributes:
-        engine (AsyncEngine): The asynchronous database engine.
-        session_local (sessionmaker): The session factory for async sessions.
+        engine: Asynchronous database engine.
+        session_local: Session factory for async sessions.
     """
 
     def __init__(self) -> None:
@@ -45,18 +45,21 @@ class RelationalStorage(Storage):
         self.session_local = AsyncSessionLocal
 
     async def setup(self) -> None:
-        """Create database tables asynchronously based on SQLModel metadata.
-
-        This method initializes the database schema.
-        """
+        """Create database tables asynchronously from SQLModel metadata."""
         async with self.engine.begin() as conn:
             await conn.run_sync(SQLModel.metadata.create_all)
 
     async def save(self, data: Dict[str, Any]):
-        """Save a single vehicle record to the database asynchronously.
+        """Persist a conversation or messages depending on the payload.
+
+        If `conversation_id` is absent, creates a new conversation record and
+        returns its ID. Otherwise, appends user and bot messages.
 
         Args:
-            data (Dict[str, Any]): The data dictionary representing a vehicle.
+            data: Conversation metadata or a turn payload.
+
+        Returns:
+            str | None: Conversation ID for new conversations; otherwise None.
         """
 
         async with self.session_local() as session:
@@ -86,23 +89,23 @@ class RelationalStorage(Storage):
                     await session.flush()
 
     async def get(self, filters: Dict[str, Any]) -> list[Dict[str, Any]]:
-        """Query vehicle records asynchronously using filter criteria.
+        """Query records using filter criteria.
 
         Args:
-            filters (Dict[str, Any]): A dictionary of filter conditions.
+            filters: Dictionary of filter conditions (e.g., table or ids).
 
         Returns:
-            List[Dict[str, Any]]: A list of vehicles matching the filters.
+            list[Dict[str, Any]]: Records matching the filters.
         """
         pass
 
     async def bulk_load(self, data: Dict) -> list[Dict[str, Any]]:
-        """Bulk load multiple vehicle records into the database asynchronously.
+        """Bulk insert multiple records asynchronously.
 
         Args:
-            data (Dict): A dictionary containing a 'records' key with a list of vehicle data.
+            data: Container with records to insert.
 
         Returns:
-            List[Dict[str, Any]]: The list of loaded vehicle records.
+            list[Dict[str, Any]]: Inserted records or identifiers.
         """
         pass

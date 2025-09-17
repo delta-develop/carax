@@ -3,31 +3,28 @@ from typing import Dict
 
 
 class LLMBase(ABC):
-    """Abstract base class for Large Language Model (LLM) interactions."""
+    """Contract for LLM clients used by the debate bot."""
 
     @abstractmethod
     async def interpret(self, user_input: str) -> Dict[str, str]:
-        """
-        Analyze the user's input to determine intent and extract relevant keywords.
+        """Infer intent or structure from a raw user input.
 
         Args:
-            user_input (str): The input message from the user.
+            user_input: Raw message from the user.
 
         Returns:
-            Dict[str, str]: A dictionary containing the identified intent and any relevant keywords.
+            dict: Parsed fields (e.g., intent, entities).
         """
-        pass
+        raise NotImplementedError
 
     @abstractmethod
     async def generate_response(self, messages: list) -> str:
-        """
-        Generate a response based on a list of structured chat messages.
+        """Generate a chat response from a structured message list.
 
         Args:
-            messages (list): A list of messages, where each message is a dictionary 
-                             containing 'role' and 'content' keys.
+            messages: Sequence of dicts with `role` and `content`.
 
         Returns:
-            str: The generated response.
+            str: Model response text.
         """
-        pass
+        raise NotImplementedError

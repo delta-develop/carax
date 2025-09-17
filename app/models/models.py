@@ -15,6 +15,7 @@ class RoleEnum(str, Enum):
 
 
 class Conversation(SQLModel, table=True):
+    """Conversation header storing debate topic and bot stance."""
     id: str = Field(default_factory=lambda: str(uuid.uuid4()), primary_key=True)
     topic: str
     stance: str
@@ -25,6 +26,7 @@ class Conversation(SQLModel, table=True):
 
 
 class Message(SQLModel, table=True):
+    """Single message belonging to a conversation (user or assistant)."""
     id: Optional[int] = Field(default=None, primary_key=True)  # autoincrement
     conversation_id: str = Field(foreign_key="conversation.id")
     role: RoleEnum
@@ -36,6 +38,7 @@ class Message(SQLModel, table=True):
 
 
 class Summary(SQLModel, table=True):
+    """Rolling summary that condenses parts of the conversation."""
     id: Optional[int] = Field(default=None, primary_key=True)
     conversation_id: str = Field(foreign_key="conversation.id")
     version: int

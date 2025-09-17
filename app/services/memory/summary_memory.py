@@ -5,19 +5,23 @@ from app.services.memory.memory import Memory
 
 
 class SummaryMemory(Memory):
-    """Handles storing and retrieving summarized conversational memory."""
+    """Longer-term summary memory for condensing debate context."""
 
     def __init__(self, llm: LLMBase):
-        """Initializes the SummaryMemory with a language model and storage."""
+        """Initialize with an LLM to create merged summaries.
+
+        Args:
+            llm: Language model used to build/update summaries.
+        """
         self.storage = None
         self.llm = llm
 
     async def store_in_memory(self, key: str, data: Any) -> None:
-        """Stores a merged summary in memory for a given user key.
+        """Create and store a merged summary for the given key.
 
         Args:
-            key: The user identifier (e.g. WhatsApp ID).
-            data: The recent conversation messages to summarize.
+            key: User identifier.
+            data: Recent messages to merge into the existing summary.
         """
         old_summary = await self.retrieve_from_memory(key)
         # prompt = await build_summary_merge_prompt(
@@ -27,21 +31,21 @@ class SummaryMemory(Memory):
         # await self.storage.save({"whatsapp_id": key, "data": merged_summary})
 
     async def retrieve_from_memory(self, key: str) -> Any:
-        """Retrieves the summarized memory for a given user key.
+        """Fetch the stored summary for a user key.
 
         Args:
-            key: The user identifier.
+            key: User identifier.
 
         Returns:
-            The summary string if found, otherwise None.
+            str | None: Summary text if present.
         """
         doc = await self.storage.get({"whatsapp_id": key})
         return doc.get("summary") if doc else None
 
     async def delete_from_memory(self, key: str) -> None:
-        """Deletes the summarized memory for a given user key.
+        """Delete the stored summary for a user key.
 
         Args:
-            key: The user identifier.
+            key: User identifier.
         """
         await self.storage.delete(key)

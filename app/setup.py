@@ -4,10 +4,9 @@ from app.services.storage.relational_storage import RelationalStorage
 
 
 async def setup_all() -> None:
-    """Initialize all storage backends asynchronously.
+    """Initialize storage backends required by the service.
 
-    This function initializes the relational and search engine storage
-    components concurrently using asyncio.
+    Currently sets up the relational database schema.
     """
     print("Initializing PostgreSQL...")
     relational_storage = RelationalStorage()
@@ -15,5 +14,5 @@ async def setup_all() -> None:
 
 
 if __name__ == "__main__":
-    """Run the setup process when the script is executed directly."""
+    """Run the async setup when executed as a script."""
     asyncio.run(setup_all())

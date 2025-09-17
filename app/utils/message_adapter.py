@@ -2,13 +2,13 @@ from typing import List
 
 
 def format_conversation(messages: List[dict]) -> List[dict[str, str]]:
-    """Clean and prepare a message list for LLM input.
+    """Filter and normalize a raw message list for the LLM.
 
     Args:
-        messages (List[dict]): A list of dictionaries representing messages.
+        messages: Sequence of raw message dicts.
 
     Returns:
-        List[dict[str, str]]: A filtered and stripped list of messages suitable for LLM input.
+        list[dict[str, str]]: Stripped messages with allowed roles only.
     """
     return [
         {"role": m["role"], "content": m["content"].strip()}
@@ -18,24 +18,24 @@ def format_conversation(messages: List[dict]) -> List[dict[str, str]]:
 
 
 def message_from_user_input(text: str) -> dict[str, str]:
-    """Convert raw user text into a format compatible with the LLM.
+    """Create a normalized user message object.
 
     Args:
-        text (str): The user's message.
+        text: User text.
 
     Returns:
-        dict[str, str]: A dictionary representing a user message.
+        dict[str, str]: Message with `role=user` and stripped content.
     """
     return {"role": "user", "content": text.strip()}
 
 
 def message_from_llm_output(text: str) -> dict[str, str]:
-    """Convert raw LLM output into a message format for memory.
+    """Create a normalized assistant message object.
 
     Args:
-        text (str): The LLM's response text.
+        text: LLM response text.
 
     Returns:
-        dict[str, str]: A dictionary representing an assistant message.
+        dict[str, str]: Message with `role=assistant` and stripped content.
     """
     return {"role": "assistant", "content": text.strip()}
