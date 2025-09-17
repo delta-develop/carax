@@ -50,6 +50,27 @@ Auth header: send `Authorization: Bearer <API_KEY>`. For now, use `prod-kopi-api
   - New conversation: `{ "conversation_id": "id", "topic": "...", "stance": "..." }`
   - Existing conversation: `{ "conversation_id": "id", "message": [ {"role": "user"|"bot", "message": "..."}, ... ] }` (last 5 entries)
 
+  Notes:
+  - The initial `message` may be written in natural language; it must clearly state the debate topic and the bot’s stance.
+  - Stances can be more nuanced than simple “for” or “against”.
+  - `conversation_id` can be a valid conversation UUID or null/omitted for new conversations.
+  - Requests and content can be in Spanish.
+
+  Request examples:
+  ```json
+  {
+    "conversation_id":null,
+    "message": "El día de hoy vamos a debatir sobre x tema, tu postura es [aquí va la postura]"
+  }
+  ```
+
+  ```json
+  {
+    "conversation_id": "86d9455b-cf6c-4141-beb3-e453648a1831",
+    "message": "Mensaje en donde el usuario envía su argumento"
+  }
+  ```
+
 - `GET /author` — author metadata
 
 Example cURL:
