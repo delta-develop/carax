@@ -1,5 +1,10 @@
 # CARAX — Debate Chatbot API
 
+Provenance and Rationale
+- This project builds upon an earlier codebase of mine: Kabot (https://github.com/delta-develop/kabot). I leveraged its modular FastAPI + async architecture to deliver quickly under a tight schedule. The ease of reuse is largely due to clear boundaries (storage, memory, LLM client), testable components, and Docker/Make tooling, which makes the codebase naturally scalable and reusable.
+- I invite you to visit Kabot and share your feedback. Being able to adapt it so smoothly here is, in my view, a testament to the quality and maintainability of that prior work.
+- Both Kabot and Carax are MVPs. I allowed myself a bit of creative freedom and personality in the implementation. In a production environment, innovative ideas remain important, but I would apply stricter caution around change management, security hardening, observability, and contract stability.
+
 Carax is a FastAPI-based service for hosting a debate-oriented chatbot. The bot holds a coherent stance for a topic, argues persuasively across multiple turns, and keeps a short-term memory to maintain context.
 
 - Tech: FastAPI, SQLModel, PostgreSQL, Redis, Docker/Compose, OpenAI API.
