@@ -147,7 +147,8 @@ async def conversation(
     user_message = message_from_user_input(message)
 
     if not conversation_id:
-        return await conversation_service.start_conversation(user_message)
+        # Si no hay id de conversación, crear la entidad conversación, y ejecutar el comando continue conversation, si hay primer argumento, responder, de no haberlo, dar un primer argumento
+        conversation_id = await conversation_service.start_conversation(user_message)
 
     response, llm_formated_response = await conversation_service.continue_conversation(
         conversation_id, user_message

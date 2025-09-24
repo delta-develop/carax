@@ -12,7 +12,7 @@ else ifeq ($(findstring Microsoft,$(shell uname -r)),Microsoft)
 	OPEN_CMD := start
 endif
 
-.PHONY: help up run down build build-app open-api open-dashboards logs logs-app ps restart rebuild fucking_nuke setup shell install clean test start venv psql rebuild-app
+.PHONY: help up run down build build-app open-api open-dashboards logs logs-app ps restart rebuild fucking_nuke setup shell install clean test start venv psql rebuild-app redis
 
 help:
 	@echo "Usage: make [target]"
@@ -35,6 +35,7 @@ help:
 	@echo "  rebuild           Rebuilds the 'app' image and restarts all services."
 	@echo "  setup             Initialize database schema inside the app container."
 	@echo "  shell             Open an interactive shell in the 'app' container."
+	@echo "  regis             Open redis-cli inside the 'redis' container."
 
 # Start all services
 up:
@@ -94,12 +95,16 @@ setup:
 
 shell:
 	docker-compose -f docker-compose.yml exec app /bin/bash
+
+redis:
+	docker-compose -f docker-compose.yml exec redis redis-cli
+
 venv:
 	@echo "Activating virtual environment..."
 	. venv/bin/activate && exec $$SHELL
 
 psql:
-	docker-compose -f docker-compose.yml exec postgres psql -U carax -d db
+	docker-compose -f docker-compose.yml exec postgres psql -U carax -d conversations
 
 rebuild-app:
 	docker-compose -f docker-compose.yml build app

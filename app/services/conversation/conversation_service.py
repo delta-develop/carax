@@ -68,9 +68,7 @@ class ConversationService:
 
         await self.cache.store_in_memory(f"{conversation_id}:meta", topic_and_stance)
 
-        llm_response_dict.update({"conversation_id": conversation_id})
-
-        return llm_response_dict
+        return conversation_id
 
     async def continue_conversation(
         self, conversation_id: str, user_message: Dict[str, str]
@@ -119,7 +117,10 @@ class ConversationService:
         return response, llm_formated_response
 
     async def persist_conversation(
-        self, conversation_id: str, user_message: Dict[str, str], llm_formated_response: Dict[str, str]
+        self,
+        conversation_id: str,
+        user_message: Dict[str, str],
+        llm_formated_response: Dict[str, str],
     ) -> None:
         """Persist the latest user/bot turn into cache and durable storage.
 
