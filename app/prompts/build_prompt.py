@@ -5,7 +5,6 @@ from app.prompts.constants import CONVERSATION_PROMPT, NEW_CONVERSATION_PROMPT
 def build_conversation_prompt(
     topic_and_stance: Dict[str, str],
     redis_stored_messages: Optional[List[Dict[str, str]]],
-    messages_summary: Optional[Any],
     last_message: Dict[str, str],
 ) -> str:
     """Compose the prompt for an ongoing debate turn.
@@ -22,7 +21,6 @@ def build_conversation_prompt(
     prompt = CONVERSATION_PROMPT.format(
         topic_and_stance=topic_and_stance,
         redis_messages=redis_stored_messages,
-        summary=messages_summary,
         last_message=last_message,
     )
 

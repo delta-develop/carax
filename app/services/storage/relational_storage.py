@@ -10,7 +10,7 @@ from sqlalchemy.orm import sessionmaker
 from sqlmodel import SQLModel, select
 
 from app.services.storage.base import Storage
-from app.models.models import Conversation, Message, Summary  # noqa: F401
+from app.models.models import Conversation, Message  # noqa: F401
 
 
 DATABASE_URL = os.getenv(
@@ -71,20 +71,13 @@ class RelationalStorage(Storage):
                     return conversation.id
 
                 else:
-                    user_message_data = {
-                        "conversation_id": data["conversation_id"],
-                        **data["user_message"],
-                    }
-
-                    bot_message_data = {
-                        "conversation_id": data["conversation_id"],
-                        **data["bot_message"],
-                    }
-                    user_message = Message(**user_message_data)
-                    bot_message = Message(**bot_message_data)
-
-                    session.add(user_message)
-                    session.add(bot_message)
+                    for message in data["messages"]:
+                        message_to_persist = Message(
+                            conversation_id=data["conversation_id"],
+                            role=message.role,
+                            content=message.content,
+                        )
+                        session.add(message_to_persist)
 
                     await session.flush()
 

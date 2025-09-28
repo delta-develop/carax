@@ -15,6 +15,10 @@ from app.utils.message_adapter import (
 from app.services.llm.base import LLMBase
 from app.services.storage.base import Storage
 from app.services.memory.memory import Memory
+from app.domain.message import MessageModel
+from app.domain.llm_output import AssistantReply
+from app.domain.meta import MetaModel
+from app.services.llm.llm_io import LLMConversationMessage, LLMConversationRequest
 
 
 class ConversationService:
@@ -42,36 +46,31 @@ class ConversationService:
         self.store = store
         self.cache = cache
 
-    async def start_conversation(self, user_message: Dict[str, str]) -> Dict[str, str]:
-        """Start a new debate given the user's first message.
+    async def start_conversation(self, message: LLMConversationMessage) -> str:
+        message.content = build_new_conversation_prompt(message.content)
 
-        The first message defines the topic and the stance the bot must adopt.
-        This method delegates to the prompt builder to extract that structure,
-        stores metadata, and returns an identifier for subsequent turns.
+        llm_request = LLMConversationRequest(messages=[message])
 
-        Args:
-            user_message: Normalized message dict from the user to initialize the debate.
+        raw_llm_response = await self.llm.generate_response(llm_request.messages)
 
-        Returns:
-            dict: A dictionary with keys `conversation_id`, `topic`, and `stance`.
-        """
-        new_conversation_prompt = build_new_conversation_prompt(user_message["content"])
-        llm_response = await self.llm.generate_response(
-            [{"role": "user", "content": new_conversation_prompt}]
+        print(f"RAW LLM RESPONSE:    {raw_llm_response}")
+
+        try:
+            llm_response_dict = json.loads(raw_llm_response)
+            topic_and_stance = MetaModel(**llm_response_dict)
+        except Exception as e:
+            raise ValueError("Topic and stance not processed.")
+
+        conversation_id = await self.store.save(topic_and_stance.model_dump())
+
+        await self.cache.store_in_memory(
+            f"{conversation_id}:meta", topic_and_stance.model_dump()
         )
-        llm_response_dict: Dict[str, str] = json.loads(llm_response)
-        topic_and_stance: Dict[str, str] = {
-            "topic": llm_response_dict["topic"],
-            "stance": llm_response_dict["stance"],
-        }
-        conversation_id = await self.store.save(topic_and_stance)
-
-        await self.cache.store_in_memory(f"{conversation_id}:meta", topic_and_stance)
 
         return conversation_id
 
     async def continue_conversation(
-        self, conversation_id: str, user_message: Dict[str, str]
+        self, conversation_id: str, user_message: LLMConversationMessage
     ) -> Tuple[Dict[str, Any], Dict[str, str]]:
         """Continue an ongoing debate with the latest user message.
 
@@ -88,39 +87,51 @@ class ConversationService:
                 - The assistant message as a message dict for downstream persistence.
         """
         cache_stored_messages = await self.cache.retrieve_from_memory(conversation_id)
+        print(f"Cache stored messages: {cache_stored_messages}")
+
         topic_and_stance = await self.cache.retrieve_from_memory(
             f"{conversation_id}:meta"
         )
-        messages_summary = await self.store.get(
-            filters={"id": conversation_id, "table": "summary"}
+
+        conversation_prompt_str = build_conversation_prompt(
+            topic_and_stance=topic_and_stance,
+            redis_stored_messages=cache_stored_messages,
+            last_message=user_message.model_dump(),
         )
 
-        conversation_prompt = build_conversation_prompt(
-            topic_and_stance, cache_stored_messages, messages_summary, user_message
+        conversation_prompt_obj = LLMConversationMessage(
+            role="system", content=conversation_prompt_str
         )
 
-        llm_response = await self.llm.generate_response(
-            [{"role": "user", "content": conversation_prompt}]
-        )
+        full_context = LLMConversationRequest(messages=[conversation_prompt_obj])
 
-        llm_formated_response = message_from_llm_output(llm_response)
+        print(f"full context: {full_context}")
+
+        llm_response = await self.llm.generate_response(full_context.messages)
+
+        llm_validated_response = LLMConversationMessage(
+            role="assistant", content=llm_response
+        )
 
         messages: List[Dict[str, str]] = list(cache_stored_messages or [])
-        messages.append(user_message)
-        messages.append(llm_formated_response)
+
+        if messages and user_message.role != "system":
+            messages.append(user_message.model_dump())
+
+        messages.append(llm_validated_response.model_dump())
 
         response: Dict[str, Any] = {
             "conversation_id": conversation_id,
             "message": messages[-5:],
         }
 
-        return response, llm_formated_response
+        return response, llm_validated_response
 
     async def persist_conversation(
         self,
         conversation_id: str,
-        user_message: Dict[str, str],
-        llm_formated_response: Dict[str, str],
+        user_message: LLMConversationMessage,
+        llm_formated_response: LLMConversationMessage,
     ) -> None:
         """Persist the latest user/bot turn into cache and durable storage.
 
@@ -129,13 +140,13 @@ class ConversationService:
             user_message: The user's message dict (role/content).
             llm_formated_response: The assistant's message dict (role/content).
         """
-        data: Dict[str, Any] = {
-            "user_message": user_message,
-            "bot_message": llm_formated_response,
-        }
+        turn_messages = [user_message, llm_formated_response]
 
-        await self.cache.store_in_memory(conversation_id, data)
+        await self.cache.store_in_memory(
+            conversation_id,
+            [message.model_dump() for message in turn_messages],
+        )
 
-        data["conversation_id"] = conversation_id
+        data = {"conversation_id": conversation_id, "messages": turn_messages}
 
         await self.store.save(data)
