@@ -1,11 +1,12 @@
 # app/db/models.py
-from typing import Optional, List, Dict, Any
-from enum import Enum
-from sqlmodel import SQLModel, Field, Relationship
-from sqlalchemy import Column, Enum as SAEnum
-from sqlalchemy.dialects.postgresql import JSONB
-from datetime import datetime
 import uuid
+from datetime import datetime
+from enum import Enum
+from typing import Any, Dict, List, Optional
+
+from sqlalchemy import Column
+from sqlalchemy.dialects.postgresql import JSONB
+from sqlmodel import Field, Relationship, SQLModel
 
 
 class RoleEnum(str, Enum):
@@ -14,7 +15,7 @@ class RoleEnum(str, Enum):
     system = "system"
 
 
-class Conversation(SQLModel, table=True):
+class Conversation(SQLModel, table=True):  # type: ignore[call-arg]
     """Conversation header storing debate topic and bot stance."""
 
     id: str = Field(default_factory=lambda: str(uuid.uuid4()), primary_key=True)
@@ -25,7 +26,7 @@ class Conversation(SQLModel, table=True):
     messages: List["Message"] = Relationship(back_populates="conversation")
 
 
-class Message(SQLModel, table=True):
+class Message(SQLModel, table=True):  # type: ignore[call-arg]
     """Single message belonging to a conversation (user or assistant)."""
 
     id: Optional[int] = Field(default=None, primary_key=True)  # autoincrement

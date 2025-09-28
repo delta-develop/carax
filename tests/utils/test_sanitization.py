@@ -1,7 +1,7 @@
 
 
-import pytest
 from app.utils.sanitization import sanitize_message
+
 
 def test_sanitize_message_returns_same_string():
     input_text = "Hello, world!"

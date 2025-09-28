@@ -1,11 +1,11 @@
 
 
-import pytest
 from app.utils.message_adapter import (
     format_conversation,
-    message_from_user_input,
     message_from_llm_output,
+    message_from_user_input,
 )
+
 
 def test_format_conversation_filters_and_strips():
     raw_messages = [

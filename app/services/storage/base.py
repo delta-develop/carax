@@ -1,5 +1,5 @@
 from abc import ABC, abstractmethod
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Optional
 
 
 class Storage(ABC):
@@ -10,11 +10,14 @@ class Storage(ABC):
     """
 
     @abstractmethod
-    async def save(self, data: Dict[str, Any]) -> None:
-        """Persist a single record.
+    async def save(self, data: Dict[str, Any]) -> Optional[str]:
+        """Persist a single record and optionally return an identifier.
 
         Args:
             data: The record payload to store.
+
+        Returns:
+            Optional[str]: Identifier of the stored record when applicable.
         """
         raise NotImplementedError
 

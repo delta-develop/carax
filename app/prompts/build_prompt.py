@@ -1,4 +1,5 @@
-from typing import Any, Dict, List, Optional
+from typing import Dict, List, Optional
+
 from app.prompts.constants import CONVERSATION_PROMPT, NEW_CONVERSATION_PROMPT
 
 

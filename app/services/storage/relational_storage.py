@@ -1,17 +1,15 @@
 import os
 from typing import Any, Dict, List, Optional
 
+from app.models.models import Conversation, Message  # noqa: F401
+from app.services.storage.base import Storage
 from sqlalchemy.ext.asyncio import (
     AsyncEngine,
     AsyncSession,
     create_async_engine,
 )
 from sqlalchemy.orm import sessionmaker
-from sqlmodel import SQLModel, select
-
-from app.services.storage.base import Storage
-from app.models.models import Conversation, Message  # noqa: F401
-
+from sqlmodel import SQLModel
 
 DATABASE_URL = os.getenv(
     "DB_ASYNC_CONNECTION_STR",
@@ -70,16 +68,23 @@ class RelationalStorage(Storage):
                     await session.flush()
                     return conversation.id
 
-                else:
-                    for message in data["messages"]:
-                        message_to_persist = Message(
-                            conversation_id=data["conversation_id"],
-                            role=message.role,
-                            content=message.content,
-                        )
-                        session.add(message_to_persist)
+                for message in data.get("messages", []):
+                    if hasattr(message, "model_dump"):
+                        message_payload = message.model_dump()
+                    elif isinstance(message, dict):
+                        message_payload = message
+                    else:
+                        raise TypeError("Unsupported message payload type for persistence")
 
-                    await session.flush()
+                    message_to_persist = Message(
+                        conversation_id=data["conversation_id"],
+                        role=message_payload["role"],
+                        content=message_payload["content"],
+                    )
+                    session.add(message_to_persist)
+
+                await session.flush()
+                return None
 
     async def get(self, filters: Dict[str, Any]) -> List[Dict[str, Any]]:
         """Query records using filter criteria.
@@ -90,7 +95,7 @@ class RelationalStorage(Storage):
         Returns:
             list[Dict[str, Any]]: Records matching the filters.
         """
-        pass
+        raise NotImplementedError("RelationalStorage.get is not implemented.")
 
     async def bulk_load(self, data: Dict) -> List[Dict[str, Any]]:
         """Bulk insert multiple records asynchronously.
@@ -101,4 +106,4 @@ class RelationalStorage(Storage):
         Returns:
             list[Dict[str, Any]]: Inserted records or identifiers.
         """
-        pass
+        raise NotImplementedError("RelationalStorage.bulk_load is not implemented.")

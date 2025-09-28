@@ -1,24 +1,15 @@
-from typing import Any, Dict, List, Optional, Tuple
+import json
+from typing import Any, Dict, List, Tuple
 
+from app.domain.meta import MetaModel
 from app.prompts.build_prompt import (
     build_conversation_prompt,
     build_new_conversation_prompt,
 )
-
-import json
-
-from app.utils.message_adapter import (
-    format_conversation,
-    message_from_user_input,
-    message_from_llm_output,
-)
 from app.services.llm.base import LLMBase
-from app.services.storage.base import Storage
-from app.services.memory.memory import Memory
-from app.domain.message import MessageModel
-from app.domain.llm_output import AssistantReply
-from app.domain.meta import MetaModel
 from app.services.llm.llm_io import LLMConversationMessage, LLMConversationRequest
+from app.services.memory.memory import Memory
+from app.services.storage.base import Storage
 
 
 class ConversationService:
@@ -58,10 +49,12 @@ class ConversationService:
         try:
             llm_response_dict = json.loads(raw_llm_response)
             topic_and_stance = MetaModel(**llm_response_dict)
-        except Exception as e:
+        except Exception:
             raise ValueError("Topic and stance not processed.")
 
         conversation_id = await self.store.save(topic_and_stance.model_dump())
+        if conversation_id is None:
+            raise ValueError("Conversation could not be persisted.")
 
         await self.cache.store_in_memory(
             f"{conversation_id}:meta", topic_and_stance.model_dump()

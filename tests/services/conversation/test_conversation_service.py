@@ -1,7 +1,7 @@
 import json
-import pytest
 from unittest.mock import AsyncMock
 
+import pytest
 from app.services.conversation.conversation_service import ConversationService
 
 

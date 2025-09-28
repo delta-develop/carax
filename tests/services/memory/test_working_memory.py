@@ -1,5 +1,6 @@
+from unittest.mock import AsyncMock
+
 import pytest
-from unittest.mock import AsyncMock, patch
 from app.services.memory.working_memory import WorkingMemory
 
 

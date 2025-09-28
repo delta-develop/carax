@@ -1,6 +1,5 @@
-from typing import List, Dict
 from datetime import datetime, timezone
-from typing import Iterable, List, Optional
+from typing import Dict, Iterable, List, Optional
 
 from app.domain.message import MessageModel
 from app.services.llm.llm_io import LLMConversationMessage

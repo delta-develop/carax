@@ -1,7 +1,8 @@
-import pytest
 from unittest.mock import AsyncMock, patch
 
+import pytest
 from app.services.llm.openai_client import OpenAIClient
+
 
 @pytest.mark.asyncio
 async def test_generate_response_creates_client_and_returns_message():

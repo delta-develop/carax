@@ -1,39 +1,27 @@
 import os
+from collections.abc import AsyncIterator
+from contextlib import asynccontextmanager
+from typing import Dict
+
 import dotenv
 from fastapi import (
     APIRouter,
+    BackgroundTasks,
+    Depends,
     FastAPI,
     HTTPException,
-    Request,
-    Depends,
     status,
-    BackgroundTasks,
 )
-
-from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
-from typing import Any, Dict
-
-from app.services.storage.relational_storage import RelationalStorage
-from app.utils.message_adapter import (
-    message_from_user_input,
-)
-
-from app.services.llm.openai_client import OpenAIClient
-from app.services.memory.working_memory import WorkingMemory
-
-
-from contextlib import asynccontextmanager
-
-from app.services.conversation.conversation_service import ConversationService
+from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 
 from app.api.dependencies import get_conversation_service
-
-from app.services.llm.llm_io import LLMConversationMessage, LLMConversationRequest
-
 from app.schemas.requests import ConversationRequest
-
-from app.schemas.responses import ConversationResponse, Turn
-
+from app.schemas.responses import ConversationResponse
+from app.services.conversation.conversation_service import ConversationService
+from app.services.llm.llm_io import LLMConversationMessage
+from app.services.llm.openai_client import OpenAIClient
+from app.services.memory.working_memory import WorkingMemory
+from app.services.storage.relational_storage import RelationalStorage
 
 dotenv.load_dotenv()
 security = HTTPBearer()
@@ -41,7 +29,7 @@ API_KEY = os.getenv("API_KEY", "dev-leonardo-key")
 
 
 @asynccontextmanager
-async def lifespan(app: FastAPI):
+async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     """Application lifespan manager to wire core services.
 
     Initializes the relational storage, LLM client, and working memory and
@@ -110,8 +98,8 @@ async def conversation(
     request: ConversationRequest,
     bg: BackgroundTasks,
     _auth: bool = Depends(require_api_key),
-    conversation_service=Depends(get_conversation_service),
-):
+    conversation_service: ConversationService = Depends(get_conversation_service),
+) -> ConversationResponse:
 
     if not request.message:
         raise HTTPException(

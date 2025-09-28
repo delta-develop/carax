@@ -1,5 +1,5 @@
-from fastapi import Request
 from app.services.conversation.conversation_service import ConversationService
+from fastapi import Request
 
 
 def get_conversation_service(request: Request) -> ConversationService:

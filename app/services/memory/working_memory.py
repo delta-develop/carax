@@ -1,14 +1,14 @@
 import json
-from app.services.memory.memory import Memory
-from app.services.storage.cache_storage import CacheStorage
 from typing import Any
 
+from app.services.memory.memory import Memory
+from app.services.storage.cache_storage import CacheStorage
 
 
 class WorkingMemory(Memory):
     """Short-term working memory backed by the cache layer."""
 
-    def __init__(self):
+    def __init__(self) -> None:
         """Initialize with a `CacheStorage` instance."""
         self.storage = CacheStorage()
 
