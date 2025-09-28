@@ -1,30 +1,27 @@
 import os
+from collections.abc import AsyncIterator
+from contextlib import asynccontextmanager
+from typing import Dict
+
 import dotenv
 from fastapi import (
     APIRouter,
+    BackgroundTasks,
+    Depends,
     FastAPI,
     HTTPException,
-    Request,
-    Depends,
     status,
-    BackgroundTasks,
 )
+from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 
-from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
-from typing import Any, Dict
-
-from app.services.storage.relational_storage import RelationalStorage
-from app.utils.message_adapter import (
-    message_from_user_input,
-)
-
+from app.api.dependencies import get_conversation_service
+from app.schemas.requests import ConversationRequest
+from app.schemas.responses import ConversationResponse
+from app.services.conversation.conversation_service import ConversationService
+from app.services.llm.llm_io import LLMConversationMessage
 from app.services.llm.openai_client import OpenAIClient
 from app.services.memory.working_memory import WorkingMemory
-
-
-from contextlib import asynccontextmanager
-
-from app.services.conversation.conversation_service import ConversationService
+from app.services.storage.relational_storage import RelationalStorage
 
 dotenv.load_dotenv()
 security = HTTPBearer()
@@ -32,7 +29,7 @@ API_KEY = os.getenv("API_KEY", "dev-leonardo-key")
 
 
 @asynccontextmanager
-async def lifespan(app: FastAPI):
+async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     """Application lifespan manager to wire core services.
 
     Initializes the relational storage, LLM client, and working memory and
@@ -60,18 +57,6 @@ router = APIRouter()
 app.include_router(router)
 
 # Initialize cache storage for debug/dev utilities
-
-
-def get_conversation_service(request: Request) -> ConversationService:
-    """Fetch the conversation service from the app state.
-
-    Args:
-        request: Incoming request used to access the app state.
-
-    Returns:
-        ConversationService: Bound service instance.
-    """
-    return request.app.state.conversation_service
 
 
 async def require_api_key(
@@ -108,57 +93,43 @@ async def get_author(_auth: bool = Depends(require_api_key)) -> Dict[str, str]:
     }
 
 
-@app.post("/chat")
+@app.post("/conversation", response_model=ConversationResponse)
 async def conversation(
-    request: Request,
+    request: ConversationRequest,
     bg: BackgroundTasks,
     _auth: bool = Depends(require_api_key),
     conversation_service: ConversationService = Depends(get_conversation_service),
-) -> Dict[str, Any]:
-    """Handle a chat turn and persist it in the background.
+) -> ConversationResponse:
 
-    For new conversations (no `conversation_id`), extracts topic and stance.
-    For ongoing conversations, composes a debate-aware prompt and returns the
-    last 5 messages, scheduling persistence as a background task.
-
-    Args:
-        request: Incoming request with JSON containing `message` and optional `conversation_id`.
-        bg: FastAPI background task manager to persist the turn asynchronously.
-        _auth: Guard ensuring the caller is authorized.
-        conversation_service: Injected service orchestrating the conversation.
-
-    Returns:
-        dict: Response envelope with either conversation metadata (new) or
-            the recent message history (existing).
-
-    Raises:
-        HTTPException: If the request payload lacks a `message`.
-    """
-    data = await request.json()
-
-    conversation_id = data.get("conversation_id")
-    message = data.get("message")
-
-    if not message:
+    if not request.message:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST, detail="Missing message field."
         )
 
-    user_message = message_from_user_input(message)
+    conversation_id = request.conversation_id
+    input_message = LLMConversationMessage(role="user", content=request.message)
+
+    print(f"Conversation_id: {conversation_id}")
+    print(f"User message: {input_message}")
 
     if not conversation_id:
-        # Si no hay id de conversación, crear la entidad conversación, y ejecutar el comando continue conversation, si hay primer argumento, responder, de no haberlo, dar un primer argumento
-        conversation_id = await conversation_service.start_conversation(user_message)
+        print("Starting conversation")
+        input_message.role = "system"
+        conversation_id = await conversation_service.start_conversation(input_message)
 
     response, llm_formated_response = await conversation_service.continue_conversation(
-        conversation_id, user_message
+        conversation_id, input_message
     )
 
     bg.add_task(
         conversation_service.persist_conversation,
         conversation_id,
-        user_message,
+        input_message,
         llm_formated_response,
     )
 
-    return response
+    result = ConversationResponse(
+        conversation_id=conversation_id, message=response["message"]
+    )
+
+    return result

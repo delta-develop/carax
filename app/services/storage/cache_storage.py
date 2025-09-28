@@ -2,6 +2,7 @@ import json
 from typing import Any, Optional, Union
 
 from app.services.storage.connections import get_redis_client
+from redis.asyncio.client import Redis
 
 
 class CacheStorage:
@@ -11,7 +12,7 @@ class CacheStorage:
     interactions, enabling fast retrieval of the latest turns within a debate.
     """
 
-    def __init__(self, namespace="memory"):
+    def __init__(self, namespace: str = "memory") -> None:
         """Initialize the cache wrapper.
 
         Args:
@@ -19,7 +20,7 @@ class CacheStorage:
         """
         self.namespace = namespace
 
-    async def _get_redis(self):
+    async def _get_redis(self) -> Redis[str]:
         """Get a Redis client connection (singleton)."""
         return await get_redis_client()
 

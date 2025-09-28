@@ -1,8 +1,9 @@
 import os
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Optional
 
 from app.services.llm.base import LLMBase
 from app.services.storage.connections import get_openai_client
+from openai import AsyncOpenAI
 
 
 class OpenAIClient(LLMBase):
@@ -12,13 +13,13 @@ class OpenAIClient(LLMBase):
     interpretation fallback for structured prompts.
     """
 
-    def __init__(self):
+    def __init__(self) -> None:
         """Initialize model and temperature from environment variables."""
         self.model = os.getenv("OPENAI_MODEL")
         self.temperature = float(os.getenv("OPENAI_TEMPERATURE", 0.7))
-        self.client = None
+        self.client: Optional[AsyncOpenAI] = None
 
-    async def get_client(self) -> "AsyncOpenAI":
+    async def get_client(self) -> AsyncOpenAI:
         """Lazily initialize and return the OpenAI client instance."""
         if self.client is None:
             self.client = await get_openai_client()

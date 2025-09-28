@@ -1,8 +1,9 @@
-import pytest
-from unittest.mock import AsyncMock
 import json
+from unittest.mock import AsyncMock
 
+import pytest
 from app.services.storage.cache_storage import CacheStorage
+
 
 @pytest.fixture
 def cache():

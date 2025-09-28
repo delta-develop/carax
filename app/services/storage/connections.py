@@ -1,13 +1,14 @@
+from typing import Optional
+
 import redis.asyncio as aioredis
 from openai import AsyncOpenAI
-from typing import Any
+from redis.asyncio.client import Redis
+
+_redis_client: Optional[Redis[str]] = None
+_openai_client: Optional[AsyncOpenAI] = None
 
 
-_redis_client = None
-_openai_client = None
-
-
-async def get_redis_client(redis_url: str = "redis://redis:6379") -> Any:
+async def get_redis_client(redis_url: str = "redis://redis:6379") -> Redis[str]:
     """Return a singleton async Redis client.
 
     Args:
@@ -19,6 +20,7 @@ async def get_redis_client(redis_url: str = "redis://redis:6379") -> Any:
     global _redis_client
     if _redis_client is None:
         _redis_client = aioredis.from_url(redis_url, decode_responses=True)
+    assert _redis_client is not None
     return _redis_client
 
 
@@ -34,4 +36,5 @@ async def get_openai_client() -> AsyncOpenAI:
 
         api_key = os.getenv("OPENAI_API_KEY")
         _openai_client = AsyncOpenAI(api_key=api_key)
+    assert _openai_client is not None
     return _openai_client

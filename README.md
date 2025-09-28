@@ -42,6 +42,33 @@ Copy `.env.example` to `.env` and fill in your values:
 - `make down`: Stop all services.
 - `make clean`: Remove containers and volumes.
 
+## SonarQube (local)
+
+SonarQube requiere al menos 4 GB de RAM asignados en Docker Desktop; si el servicio no arranca o se reinicia, aumenta la memoria disponible en la configuración de Docker.
+
+1. Ejecuta `make sonar-up` y espera ~1-2 minutos a que el servidor inicialice.
+2. Abre http://localhost:9000, inicia sesión con `admin`/`admin` y cambia la contraseña cuando se solicite.
+3. Crea un token personal en SonarQube (`My Account` → `Security`).
+4. Exporta el token en tu entorno: `export SONAR_TOKEN=<tu-token>`.
+5. Lanza el análisis con `make sonar-scan`.
+6. Consulta los resultados en http://localhost:9000/projects. Usa `make sonar-logs` para ver el arranque si lo necesitas y `make sonar-down` para detener SonarQube.
+
+**Solución de problemas**
+- Si el escáner no conecta, verifica que `http://localhost:9000` esté arriba (puedes usar `make sonar-logs`).
+- Asegúrate de que `SONAR_TOKEN` esté exportado y que coincida con un token válido.
+
+## Análisis estático (local)
+
+Ejecuta los siguientes comandos dentro del repositorio para preparar el entorno y correr la suite completa de análisis:
+
+```bash
+python -m venv .venv
+source .venv/bin/activate
+make dev-install
+make qa        # lint+types+security+deadcode+complexity
+make test-cov  # genera coverage.xml
+```
+
 ## API
 
 Auth header: send `Authorization: Bearer <API_KEY>`. For now, use `prod-kopi-api-key` as the token value.

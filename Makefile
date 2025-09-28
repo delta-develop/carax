@@ -4,6 +4,17 @@
 API_URL := http://localhost:8000
 DASHBOARDS_URL := http://localhost:5601
 
+SONAR_HOST_URL ?= http://localhost:9000
+
+VENV?=.venv/bin
+PYTEST=$(VENV)/pytest
+RUFF=$(VENV)/ruff
+MYPY=$(VENV)/mypy
+BANDIT=$(VENV)/bandit
+VULTURE=$(VENV)/vulture
+RADON=$(VENV)/radon
+XENON=$(VENV)/xenon
+
 # Commands to open URLs (tries to be compatible with Linux, macOS, and Windows)
 OPEN_CMD := xdg-open
 ifeq ($(shell uname -s),Darwin)
@@ -146,3 +157,56 @@ install:
 clean:
 	@echo "Stopping and removing containers, networks, and volumes..."
 	docker-compose -f docker-compose.yml down -v || true
+
+.PHONY: sonar-up
+sonar-up:
+	docker compose up -d sonarqube
+
+.PHONY: sonar-down
+sonar-down:
+	docker compose stop sonarqube
+
+.PHONY: sonar-logs
+sonar-logs:
+	docker compose logs -f sonarqube
+
+.PHONY: dev-install
+dev-install:
+	python -m pip install -r requirements-dev.txt
+
+.PHONY: lint
+lint:
+	$(RUFF) check app tests --fix
+
+.PHONY: types
+types:
+	$(MYPY) app
+
+.PHONY: security
+security:
+	$(BANDIT) -q -r app
+
+.PHONY: deadcode
+deadcode:
+	$(VULTURE) app tests
+
+.PHONY: complexity
+complexity:
+	$(RADON) cc -s -a app && $(XENON) --max-absolute B --max-average A --max-modules B app
+
+.PHONY: qa
+qa: lint types security deadcode complexity
+
+.PHONY: test-cov
+test-cov:
+	$(PYTEST) -q --cov=app --cov-report=xml:coverage.xml
+
+.PHONY: sonar-scan
+sonar-scan: test-cov
+	@if [ -z "$$SONAR_TOKEN" ]; then echo "Falta SONAR_TOKEN en el entorno"; exit 1; fi
+	docker run --rm \
+	  -e SONAR_HOST_URL=$(SONAR_HOST_URL) \
+	  -e SONAR_LOGIN=$$SONAR_TOKEN \
+	  -v $$PWD:/usr/src \
+	  --network host \
+	  sonarsource/sonar-scanner-cli:latest
