@@ -1,0 +1,50 @@
+# OS / Editor
+.DS_Store
+.idea/
+.vscode/
+.history/
+
+# Python
+__pycache__/
+*.py[cod]
+*.so
+*.pyd
+*.pyo
+*.egg
+*.egg-info/
+dist/
+build/
+pip-wheel-metadata/
+.python-version
+
+# Virtual envs
+venv/
+.venv/
+env/
+
+# Testing / Coverage
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.cache/
+.tox/
+.coverage
+.coverage.*
+coverage.xml
+htmlcov/
+
+# Logs
+*.log
+logs/
+
+# Environment / Secrets
+.env
+.env.*
+!.env.example
+
+# Docker
+docker-compose.override.yml
+*.pid
+
+# Notebooks / Misc
+.ipynb_checkpoints/
